@@ -24,13 +24,14 @@ class Html5Fairplay {
     this.protection_ = source && source.protection;
     this.tech_ = tech;
 
+    this.getKeySessionContentId = (this.protection_.getKeySessionContentId ? this.protection_.getKeySessionContentId : this.getKeySessionContentId.bind(this));
     this.onCertificateError = this.onCertificateError.bind(this);
     this.onCertificateLoad = this.onCertificateLoad.bind(this);
     this.onKeySessionWebkitKeyAdded = this.onKeySessionWebkitKeyAdded.bind(this);
     this.onKeySessionWebkitKeyError = this.onKeySessionWebkitKeyError.bind(this);
     this.onKeySessionWebkitKeyMessage = this.onKeySessionWebkitKeyMessage.bind(this);
     this.onLicenseError = this.onLicenseError.bind(this);
-    this.onLicenseLoad = this.onLicenseLoad.bind(this);
+    this.onLicenseLoad = (this.protection_.onLicenseRequestLoaded ? this.protection_.onLicenseRequestLoaded : this.onLicenseLoad.bind(this));
     this.onVideoError = this.onVideoError.bind(this);
     this.onVideoWebkitNeedKey = this.onVideoWebkitNeedKey.bind(this);
 
@@ -90,7 +91,7 @@ class Html5Fairplay {
 
     const { licenseUrl } = this.protection_;
 
-    const request = new XMLHttpRequest();
+    var request = new XMLHttpRequest();
 
     request.responseType = 'arraybuffer';
     request.session = target;
@@ -99,7 +100,17 @@ class Html5Fairplay {
     request.addEventListener('load', this.onLicenseLoad, false);
 
     request.open('POST', licenseUrl, true);
-    request.setRequestHeader('Content-type', 'application/octet-stream');
+
+    if (this.protection_.updateLicenseRequest) {
+      request = this.protection_.updateLicenseRequest(request);
+    } else {
+      request.setRequestHeader('Content-Type', 'application/octet-stream');
+    }
+
+    if (this.protection_.getLicenseRequestMessage) {
+      message = this.protection_.getLicenseRequestMessage(target, message);
+    }
+
     request.send(message);
   }
 
@@ -235,7 +246,7 @@ class Html5Fairplay {
 
     const { keySystem } = this.protection_;
 
-    const contentId = getHostnameFromURI(arrayToString(event.initData));
+    const contentId = this.getKeySessionContentId(event.initData);
 
     const initData = concatInitDataIdAndCertificate(event.initData, contentId, certificate);
 
@@ -246,6 +257,10 @@ class Html5Fairplay {
     keySession.addEventListener('webkitkeyadded', this.onKeySessionWebkitKeyAdded, false);
     keySession.addEventListener('webkitkeyerror', this.onKeySessionWebkitKeyError, false);
     keySession.addEventListener('webkitkeymessage', this.onKeySessionWebkitKeyMessage, false);
+  }
+
+  getKeySessionContentId(initData) {
+    return getHostnameFromURI(arrayToString(event.initData));
   }
 
   src({ src }) {
